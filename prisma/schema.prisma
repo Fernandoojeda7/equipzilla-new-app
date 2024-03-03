@@ -21,3 +21,9 @@ model mensaje {
   alquilador   alquilador @relation(fields: [alquiladorID], references: [id])
   alquiladorID Int
 }
+
+model maquina {
+  id     Int    @id @default(autoincrement())
+  modelo String
+  serie  String
+}
