@@ -71,7 +71,6 @@ jobs:
 
       - name: Autenticarse en Docker para Artifact Registry
         run: |
-          gcloud auth login
           gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://europe-west1-docker.pkg.dev
 
       # Get the GKE credentials so we can deploy to the cluster
