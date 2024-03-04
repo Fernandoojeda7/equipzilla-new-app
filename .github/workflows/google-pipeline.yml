@@ -69,9 +69,10 @@ jobs:
           cluster_name: ${{ env.GKE_CLUSTER }}
           location: ${{ env.GKE_ZONE }}
 
-      - name: Autenticarse en Docker para Artifact Registry
+      - name: Autenticarse en Artifact Registry
         run: |
-          gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://$GAR_LOCATION-docker.pkg.dev
+            echo "${{ secrets.GCP_TOKEN }}" | docker login -u oauth2accesstoken --password-stdin https://$GAR_LOCATION-docker.pkg.dev
+
 
       - name: Docker configuration
         run: |-
