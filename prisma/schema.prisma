@@ -7,23 +7,172 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model alquilador {
-  id        Int       @id @default(autoincrement())
-  nombre    String?
-  email     String?
-  direccion String?
-  mensajes  mensaje[]
+model Alquilador {
+  id                Int                  @id @default(autoincrement())
+  nombre            String
+  logo              String
+  cliente           Int
+  gestionEZ         Int
+  transaccional     Int
+  renting           Int
+  fecha_alta        DateTime
+  fecha_baja        DateTime?
+  cif               String
+  lead_alquiladores Leads_alquiladores[]
+  lead_emails       Leads_emails?
+  Leads_estados     Leads_estados?
+  Leads_mensajes    Leads_mensajes?
+  Leads_notas       Leads_notas?
+  Leads_ofertas     Leads_ofertas?
+  Leads_perdidos    Leads_perdidos?
 }
 
-model mensaje {
+model Leads {
+  id               Int                 @id @default(autoincrement())
+  formID           String?
+  workspaceID      String?
+  name             String
+  CIF              String?
+  businessName     String?
+  businessAddress  String?
+  email            String
+  phone            String
+  assetType        String
+  assetUse         String?
+  assetOutdoor     String?
+  assetKVA         String?
+  assetHeight      String?
+  assetWeight      String?
+  assetSound       String?
+  assetExtra       String?
+  assetOperator    String?
+  assetEngine      String?
+  zipcode          String
+  address          String?
+  dateStart        DateTime
+  dateFinish       DateTime
+  dateFlexible     String?
+  legal            Boolean?
+  validated        Boolean?
+  leadManagement   String?
+  rentType         String?
+  Gestion          String?
+  reasonLost       String?
+  profesional      String?
+  url              String
+  sendinblueID     String?
+  createdAt        DateTime
+  updatedAt        DateTime
+  pipedriveDealID  String?
+  maxPrice         Decimal?
+  fastTrack        String?
+  gclid            String?
+  machine          String?
+  transactional    Int?
+  ActiveCampaignID Int?
+  NumeroAlquileres String?
+  lead_alquileres  Leads_alquiladores?
+  lead_emails      Leads_emails?
+  Leads_estados    Leads_estados?
+  Leads_mensajes   Leads_mensajes?
+  Leads_notas      Leads_notas?
+  Leads_ofertas    Leads_ofertas?
+  Leads_perdidos   Leads_perdidos?
+}
+
+model Leads_alquiladores {
   id           Int        @id @default(autoincrement())
-  texto        String
-  alquilador   alquilador @relation(fields: [alquiladorID], references: [id])
+  lead         Leads      @relation(fields: [leadID], references: [id])
+  leadID       Int        @unique
+  alquilador   Alquilador @relation(fields: [alquiladorID], references: [id])
   alquiladorID Int
+  UbicacionID  Int
+  CP           String
+  sendinblueID String?
+  gravitecID   String?
+  fecha_inicio DateTime
 }
 
-model maquina {
-  id     Int    @id @default(autoincrement())
-  modelo String
-  serie  String
+model Leads_emails {
+  id                  Int         @id @default(autoincrement())
+  lead                Leads       @relation(fields: [leadID], references: [id])
+  leadID              Int         @unique
+  alquilador          Alquilador? @relation(fields: [alquiladorID], references: [id])
+  alquiladorID        Int?        @unique
+  CP                  String
+  email               String?
+  telefono            String?
+  telefono_encriptado Boolean?
+}
+
+enum Estado {
+  Recibido
+  Aplazodo
+  Error
+}
+
+enum Leads_mensajes_origen {
+  alquilador
+  cliente
+}
+
+model Leads_estados {
+  Id                Int         @id @default(autoincrement())
+  lead              Leads       @relation(fields: [leadID], references: [id])
+  leadID            Int         @unique
+  alquilador        Alquilador? @relation(fields: [alquiladorID], references: [id])
+  alquiladorID      Int?        @unique
+  usuario           String?
+  estado            Estado      @default(Recibido)
+  fecha_estado_alta DateTime
+  fecha_estado_baja DateTime?
+}
+
+model Leads_mensajes {
+  id           Int                   @id @default(autoincrement())
+  lead         Leads                 @relation(fields: [leadID], references: [id])
+  leadID       Int                   @unique
+  alquilador   Alquilador?           @relation(fields: [alquiladorID], references: [id])
+  alquiladorID Int?                  @unique
+  usuario      String
+  origen       Leads_mensajes_origen
+  mensaje      String
+  fecha        DateTime              @default(now())
+}
+
+model Leads_notas {
+  id              Int         @id @default(autoincrement())
+  lead            Leads       @relation(fields: [leadID], references: [id])
+  leadID          Int         @unique
+  alquilador      Alquilador? @relation(fields: [alquiladorID], references: [id])
+  alquiladorID    Int         @unique
+  usuario         String?
+  nota            String?
+  fecha_nota_alta DateTime    @default(now())
+  fecha_nota_baja DateTime?
+}
+
+model Leads_ofertas {
+  id                Int         @id @default(autoincrement())
+  lead              Leads       @relation(fields: [leadID], references: [id])
+  leadID            Int         @unique
+  alquilador        Alquilador? @relation(fields: [alquiladorID], references: [id])
+  alquiladorID      Int         @unique
+  usuario           String?
+  oferta            String?
+  importe           String
+  fecha_oferta_alta DateTime    @default(now())
+  fecha_oferta_baja DateTime?
+}
+
+model Leads_perdidos {
+  id                 Int         @id @default(autoincrement())
+  lead               Leads       @relation(fields: [leadID], references: [id])
+  leadID             Int         @unique
+  alquilador         Alquilador? @relation(fields: [alquiladorID], references: [id])
+  alquiladorID       Int         @unique
+  usuario            String?     @db.VarChar(100)
+  motivo             String?     @default("") @db.VarChar(100)
+  fecha_perdido_alta DateTime    @default(now()) @db.DateTime(0)
+  fecha_perdido_baja DateTime?   @db.DateTime(0)
 }

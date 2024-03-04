@@ -9,6 +9,7 @@
     "tsc": "tsc",
     "migrate": "npx prisma migrate dev",
     "push": "npx prisma db push",
+    "pull": "npx prisma pull",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
