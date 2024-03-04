@@ -61,7 +61,7 @@ jobs:
       - name: Obtener credenciales de Kubernetes
         run: |
           gcloud container clusters get-credentials $GKE_CLUSTER --region $GKE_ZONE --project $PROJECT_ID
-          kubectl config use-context gke_$PROJECT_ID_$GKE_ZONE_$GKE_CLUSTER
+          kubectl config use-context gke_${PROJECT_ID}_${GKE_ZONE}_${GKE_CLUSTER}
 
       - name: Configurar credenciales de GKE
         uses: google-github-actions/get-gke-credentials@v1
