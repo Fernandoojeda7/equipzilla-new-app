@@ -9,7 +9,7 @@ app.use(morgan("dev"));
 
 app.get("/", (_req, res) => {
   console.log("Hello Equipzilla!");
-  res.send("Welcome to Equipzilla");
+  res.send("Welcome to Equipzilla Probando el nuevo servidor desde Cloud Run");
 });
 
 app.listen(`${process.env.PORT}`, () => {
