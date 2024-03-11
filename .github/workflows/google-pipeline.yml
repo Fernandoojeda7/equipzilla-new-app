@@ -61,26 +61,17 @@ jobs:
       - name: Configure Docker
         run: gcloud auth configure-docker --quiet
 
+      # Build Docker image
       - name: Build Docker image
-        run: |
-          if [[ $GITHUB_REF = "refs/heads/main" ]]; then
-            TAG="latest"
-          elif [[ $GITHUB_REF = "refs/heads/staging" ]] || [[ $GITHUB_REF == refs/heads/skipe/* ]]; then
-            TAG="staging"
-          elif [[ $GITHUB_REF = "refs/heads/develop" ]] || [[ $GITHUB_REF == refs/heads/feature/* ]]; then
-            TAG="develop"
-          fi
+        run: docker build -t $IMAGE .
 
-          docker build \
-            --tag "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$TAG" \
-            --build-arg GITHUB_SHA="$GITHUB_SHA" \
-            --build-arg GITHUB_REF="$GITHUB_REF" \
-            .
+      # Tag Docker image with GCR URI
+      - name: Tag Docker image
+        run: docker tag $IMAGE
 
+      # Push Docker image to Container Registry
       - name: Push Docker image
-        run: |
-          TAG="${GITHUB_REF##*/}"
-          docker push "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$TAG"
+        run: docker push $IMAGE
 
       - name: Deploy to Cloud Run - feature/skipe branches
         if: startsWith(github.ref, 'feature/') || startsWith(github.ref, 'skipe/')
@@ -98,11 +89,11 @@ jobs:
       - name: Deploy to Cloud Run
         run: |
           if [[ $GITHUB_REF == "refs/heads/develop" ]]; then
-            gcloud run deploy site --image "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:develop" --region $GKE_ZONE --memory 128Mi --min-instances 1 --max-instances 5 --platform managed --port 8080 --allow-unauthenticated
+            gcloud run deploy site --image $IMAGE --region $GKE_ZONE --memory 128Mi --min-instances 1 --max-instances 5 --platform managed --port 8080 --allow-unauthenticated
           elif [[ $GITHUB_REF == "refs/heads/staging" ]]; then
-            gcloud run deploy site --image "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:staging" --region $GKE_ZONE --memory 256Mi --min-instances 1 --max-instances 3 --platform managed --port 80 --allow-unauthenticated
+            gcloud run deploy site --image $IMAGE --region $GKE_ZONE --memory 256Mi --min-instances 1 --max-instances 3 --platform managed --port 80 --allow-unauthenticated
           elif [[ $GITHUB_REF == "refs/heads/main" ]]; then
-            gcloud run deploy site --image "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:latest" --region $GKE_ZONE --memory 512Mi --min-instances 2 --max-instances 10 --platform managed --port 443 --allow-unauthenticated
+            gcloud run deploy site --image $IMAGE --region $GKE_ZONE --memory 512Mi --min-instances 2 --max-instances 10 --platform managed --port 443 --allow-unauthenticated
           else
             echo "Rama no reconocida, no se realizará el despliegue."
           fi
