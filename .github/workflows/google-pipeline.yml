@@ -89,11 +89,11 @@ jobs:
       - name: Deploy to Cloud Run
         run: |
           if [[ $GITHUB_REF == "refs/heads/develop" ]]; then
-            gcloud run deploy site --image $IMAGE --region $GKE_ZONE --memory 128Mi --min-instances 1 --max-instances 5 --platform managed --port 8080 --allow-unauthenticated
+            gcloud run deploy site --image $IMAGE --region $GKE_ZONE --memory 256Mi --min-instances 1 --max-instances 5 --platform managed --port 8080 --allow-unauthenticated
           elif [[ $GITHUB_REF == "refs/heads/staging" ]]; then
-            gcloud run deploy site --image $IMAGE --region $GKE_ZONE --memory 256Mi --min-instances 1 --max-instances 3 --platform managed --port 80 --allow-unauthenticated
+            gcloud run deploy site --image $IMAGE --region $GKE_ZONE --memory 512Mi --min-instances 1 --max-instances 3 --platform managed --port 80 --allow-unauthenticated
           elif [[ $GITHUB_REF == "refs/heads/main" ]]; then
-            gcloud run deploy site --image $IMAGE --region $GKE_ZONE --memory 512Mi --min-instances 2 --max-instances 10 --platform managed --port 443 --allow-unauthenticated
+            gcloud run deploy site --image $IMAGE --region $GKE_ZONE --memory 1024Mi --min-instances 2 --max-instances 10 --platform managed --port 443 --allow-unauthenticated
           else
             echo "Rama no reconocida, no se realizará el despliegue."
           fi
