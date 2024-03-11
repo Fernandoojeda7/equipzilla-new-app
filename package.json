@@ -9,6 +9,7 @@
     "tsc": "tsc",
     "migrate": "npx prisma migrate dev",
     "push": "npx prisma db push",
+    "pull": "npx prisma pull",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -17,6 +18,7 @@
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/morgan": "^1.9.9",
+    "dotenv": "^16.4.5",
     "morgan": "^1.10.0",
     "prisma": "^5.10.2",
     "ts-node-dev": "^2.0.0",

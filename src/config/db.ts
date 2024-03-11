@@ -26,7 +26,7 @@ function getPossibleWords(word: string) {
   return possibleWords;
 }
 
-prisma.$use(async (params, next) => {
+prisma.$use(async (params: any, next: any) => {
   if (params.action === "findMany" && params.args) {
     const stringArgs = JSON.stringify(params.args);
     const regex = /"contains":/;

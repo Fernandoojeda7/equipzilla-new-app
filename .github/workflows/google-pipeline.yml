@@ -1,0 +1,99 @@
+name: Build and Deploy to GKE
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+      - develop
+      - "feature/*"
+      - "skipe/*"
+
+env:
+  PROJECT_ID: ${{ secrets.GKE_PROJECT }}
+  GKE_ZONE: us-central1 # TODO: update to cluster zone
+  REPOSITORY: repo-equipzilla # TODO: update to Artifact Registry docker repository
+  GAR_LOCATION: us-central1
+  IMAGE: gcr.io/${{ secrets.GKE_PROJECT }}/site:latest
+
+jobs:
+  setup-build-publish-deploy:
+    name: Setup, Build, Publish, and Deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+
+    permissions:
+      contents: "read"
+      id-token: "write"
+
+    steps:
+      - name: Autenticarse con GitHub CLI usando token
+        run: |
+          echo "${{ secrets.GH_TOKEN }}" | gh auth login --with-token
+
+      - name: Utilizar Node.js v20
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: git checkout
+        uses: actions/checkout@v2
+
+      - name: Autenticar en Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+          project_id: ${{ secrets.GCP_PROJECT }}
+
+      - name: Verificar si el repositorio de artefactos ya existe
+        id: check_repo_exists
+        run: |
+          gcloud artifacts repositories describe $REPOSITORY --location=$GAR_LOCATION --format="value(name)" || exit 1
+        continue-on-error: true
+
+      - name: Crear repositorio en Artifact Registry si no existe
+        if: steps.check_repo_exists.outcome != 'success'
+        run: |
+          gcloud artifacts repositories create $REPOSITORY --repository-format=docker --location=$GAR_LOCATION
+
+      # gcloud configure docker
+      - name: Configure Docker
+        run: gcloud auth configure-docker --quiet
+
+      # Build Docker image
+      - name: Build Docker image
+        run: docker build -t $IMAGE .
+
+      # Tag Docker image with GCR URI
+      - name: Tag Docker image
+        run: docker tag $IMAGE $IMAGE
+
+      # Push Docker image to Container Registry
+      - name: Push Docker image
+        run: docker push $IMAGE
+
+      - name: Deploy to Cloud Run - feature/skipe branches
+        if: startsWith(github.ref, 'feature/') || startsWith(github.ref, 'skipe/')
+        run: |
+          if [[ $GITHUB_REF == refs/heads/feature/* ]]; then
+            # Crear pull request de feature/* a develop
+            gh pr create --base develop --head $GITHUB_REF --title "Pull Request para incorporar cambios en $GITHUB_REF a develop" --body "Descripción del pull request aquí"
+          elif [[ $GITHUB_REF == refs/heads/skipe/* ]]; then
+            # Desplegar directamente a staging
+            git checkout -b staging
+            git merge $GITHUB_REF --no-edit
+            git push origin staging
+          fi
+
+      - name: Deploy to Cloud Run
+        run: |
+          if [[ $GITHUB_REF == "refs/heads/develop" ]]; then
+            gcloud run deploy site --image $IMAGE --region $GKE_ZONE --memory 256Mi --min-instances 1 --max-instances 5 --platform managed --port 8080 --allow-unauthenticated
+          elif [[ $GITHUB_REF == "refs/heads/staging" ]]; then
+            gcloud run deploy site --image $IMAGE --region $GKE_ZONE --memory 512Mi --min-instances 1 --max-instances 3 --platform managed --port 80 --allow-unauthenticated
+          elif [[ $GITHUB_REF == "refs/heads/main" ]]; then
+            gcloud run deploy site --image $IMAGE --region $GKE_ZONE --memory 1024Mi --min-instances 2 --max-instances 10 --platform managed --port 443 --allow-unauthenticated
+          else
+            echo "Rama no reconocida, no se realizará el despliegue."
+          fi
