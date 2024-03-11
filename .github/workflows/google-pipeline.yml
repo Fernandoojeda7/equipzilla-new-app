@@ -11,12 +11,9 @@ on:
 
 env:
   PROJECT_ID: ${{ secrets.GKE_PROJECT }}
-  GAR_LOCATION: us-central1 # TODO: update region of the Artifact Registry
-  GKE_CLUSTER: new-app-equipzilla # TODO: update to cluster name
   GKE_ZONE: us-central1 # TODO: update to cluster zone
-  DEPLOYMENT_NAME: gke-app # TODO: update to deployment name
   REPOSITORY: repo-equipzilla # TODO: update to Artifact Registry docker repository
-  IMAGE: equipzilla-image
+  IMAGE: gcr.io/${{ secrets.GKE_PROJECT }}/site:latest
 
 jobs:
   setup-build-publish-deploy:
@@ -40,12 +37,13 @@ jobs:
           node-version: "20"
 
       - name: git checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
       - name: Autenticar en Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+          project_id: ${{ secrets.GCP_PROJECT }}
 
       - name: Verificar si el repositorio de artefactos ya existe
         id: check_repo_exists
@@ -58,91 +56,52 @@ jobs:
         run: |
           gcloud artifacts repositories create $REPOSITORY --repository-format=docker --location=$GAR_LOCATION
 
-      - name: Obtener credenciales de Kubernetes
-        run: |
-          gcloud container clusters get-credentials $GKE_CLUSTER --region $GKE_ZONE --project $PROJECT_ID
-          kubectl config use-context gke_${PROJECT_ID}_${GKE_ZONE}_${GKE_CLUSTER}
+      # gcloud configure docker
+      - name: Configure Docker
+        run: gcloud auth configure-docker --quiet
 
-      - name: Configurar credenciales de GKE
-        uses: google-github-actions/get-gke-credentials@v1
-        with:
-          cluster_name: ${{ env.GKE_CLUSTER }}
-          location: ${{ env.GKE_ZONE }}
-
-      - name: Autenticarse en Docker para Artifact Registry
-        run: |
-          gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://europe-west1-docker.pkg.dev
-          gcloud auth configure-docker \
-          us-central1-docker.pkg.dev
-
-      # Paso 2: Compilar y Publicar
-      - name: Compilar y Publicar
+      - name: Build Docker image
         run: |
           if [[ $GITHUB_REF = "refs/heads/main" ]]; then
-            # Desplegar en producción
-            docker build \
-            --tag "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$GITHUB_SHA" \
-            --build-arg GITHUB_SHA="$GITHUB_SHA" \
-            --build-arg GITHUB_REF="$GITHUB_REF" \
-            .
-
-            docker push "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$GITHUB_SHA"
+            TAG="latest"
           elif [[ $GITHUB_REF = "refs/heads/staging" ]] || [[ $GITHUB_REF == refs/heads/skipe/* ]]; then
-            # Desplegar en entorno de staging
-            docker build \
-            --tag "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$GITHUB_SHA" \
-            --build-arg GITHUB_SHA="$GITHUB_SHA" \
-            --build-arg GITHUB_REF="$GITHUB_REF" \
-            .
-
-            docker push "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$GITHUB_SHA"
+            TAG="staging"
           elif [[ $GITHUB_REF = "refs/heads/develop" ]] || [[ $GITHUB_REF == refs/heads/feature/* ]]; then
-            # Incorporar cambios en desarrollo
-            docker build \
-            --tag "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$GITHUB_SHA" \
-            --build-arg GITHUB_SHA="$GITHUB_SHA" \
-            --build-arg GITHUB_REF="$GITHUB_REF" \
-            .
-
-            docker push "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$GITHUB_SHA"
-
-            if [[ $GITHUB_REF == refs/heads/feature/* ]]; then
-              # Crear pull request de feature/* a develop
-              gh pr create --base develop --head $GITHUB_REF --title "Pull Request para incorporar cambios en $GITHUB_REF a develop" --body "Descripción del pull request aquí"
-            fi
+            TAG="develop"
           fi
 
-      # Set up kustomize
-      - name: Set up Kustomize
-        run: |-
-          curl -sfLo kustomize https://github.com/kubernetes-sigs/kustomize/releases/download/v3.1.0/kustomize_3.1.0_linux_amd64
-          chmod u+x ./kustomize
+          docker build \
+            --tag "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$TAG" \
+            --build-arg GITHUB_SHA="$GITHUB_SHA" \
+            --build-arg GITHUB_REF="$GITHUB_REF" \
+            .
 
-      # Paso 3: Desplegar archivos de Kubernetes
-      # - name: Deploy
-      #   run: |
-      #     if [[ $GITHUB_REF = "refs/heads/main" ]]; then
-      #       ./kustomize edit set image LOCATION-docker.pkg.dev/PROJECT_ID/REPOSITORY/IMAGE:TAG=$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$GITHUB_SHA
-      #       ./kustomize build . | kubectl apply -f -
-      #       kubectl rollout status deployment/$DEPLOYMENT_NAME
-      #       kubectl get services -o wide
-      #     elif [[ $GITHUB_REF = "refs/heads/staging" ]] || [[ $GITHUB_REF == refs/heads/skipe/* ]]; then
-      #       ./kustomize edit set image LOCATION-docker.pkg.dev/PROJECT_ID/REPOSITORY/IMAGE:TAG=$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$GITHUB_SHA
-      #       ./kustomize build . | kubectl apply -f -
-      #       kubectl rollout status deployment/$DEPLOYMENT_NAME
-      #       kubectl get services -o wide
-      #     elif [[ $GITHUB_REF = "refs/heads/develop" ]] || [[ $GITHUB_REF == refs/heads/feature/* ]]; then
-      #       ./kustomize edit set image LOCATION-docker.pkg.dev/PROJECT_ID/REPOSITORY/IMAGE:TAG=$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$GITHUB_SHA
-      #       ./kustomize build . | kubectl apply -f -
-      #       kubectl rollout status deployment/$DEPLOYMENT_NAME
-      #       kubectl get services -o wide
-      #     fi
+      - name: Push Docker image
+        run: |
+          TAG="${GITHUB_REF##*/}"
+          docker push "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$TAG"
 
-      # # Deploy the Docker image to the GKE cluster
-      # - name: Deploy
-      #   run: |-
-      #     # replacing the image name in the k8s template
-      #     ./kustomize edit set image LOCATION-docker.pkg.dev/PROJECT_ID/REPOSITORY/IMAGE:TAG=$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$GITHUB_SHA
-      #     ./kustomize build . | kubectl apply -f -
-      #     kubectl rollout status deployment/$DEPLOYMENT_NAME
-      #     kubectl get services -o wide
+      - name: Deploy to Cloud Run - feature/skipe branches
+        if: startsWith(github.ref, 'feature/') || startsWith(github.ref, 'skipe/')
+        run: |
+          if [[ $GITHUB_REF == refs/heads/feature/* ]]; then
+            # Crear pull request de feature/* a develop
+            gh pr create --base develop --head $GITHUB_REF --title "Pull Request para incorporar cambios en $GITHUB_REF a develop" --body "Descripción del pull request aquí"
+          elif [[ $GITHUB_REF == refs/heads/skipe/* ]]; then
+            # Desplegar directamente a staging
+            git checkout -b staging
+            git merge $GITHUB_REF --no-edit
+            git push origin staging
+          fi
+
+      - name: Deploy Docker image to Cloud Run
+        run: |
+          if [[ $GITHUB_REF == "refs/heads/develop" ]]; then
+            gcloud run deploy site --image $IMAGE --region $GKE_ZONE --memory 128Mi --min-instances 1 --max-instances 5 --platform managed --port 8080 --allow-unauthenticated
+          elif [[ $GITHUB_REF == "refs/heads/staging" ]]; then
+            gcloud run deploy site --image $IMAGE --region $GKE_ZONE --memory 256Mi --min-instances 1 --max-instances 3 --platform managed --port 80 --allow-unauthenticated
+          elif [[ $GITHUB_REF == "refs/heads/main" ]]; then
+            gcloud run deploy site --image $IMAGE --region $GKE_ZONE --memory 512Mi --min-instances 2 --max-instances 10 --platform managed --port 443 --allow-unauthenticated
+          else
+            echo "Rama no reconocida, no se realizará el despliegue."
+          fi

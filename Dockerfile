@@ -16,8 +16,11 @@ RUN npm install
 # Copia el resto del código fuente de la aplicación
 COPY . .
 
+# Hacer un build de la aplicación
+RUN npm run tsc
+
 # Expone el puerto de la aplicación
 EXPOSE 5000
 
 # Ejecuta la aplicación
-CMD [ "npm", "run dev" ]
+CMD [ "npm", "run", "dev" ]
