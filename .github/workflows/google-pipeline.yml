@@ -13,6 +13,7 @@ env:
   PROJECT_ID: ${{ secrets.GKE_PROJECT }}
   GKE_ZONE: us-central1 # TODO: update to cluster zone
   REPOSITORY: repo-equipzilla # TODO: update to Artifact Registry docker repository
+  GAR_LOCATION: us-central1
   IMAGE: gcr.io/${{ secrets.GKE_PROJECT }}/site:latest
 
 jobs:
@@ -48,13 +49,13 @@ jobs:
       - name: Verificar si el repositorio de artefactos ya existe
         id: check_repo_exists
         run: |
-          gcloud artifacts repositories describe $REPOSITORY --location=$GKE_ZONE --format="value(name)" || exit 1
+          gcloud artifacts repositories describe $REPOSITORY --location=$GAR_LOCATION --format="value(name)" || exit 1
         continue-on-error: true
 
       - name: Crear repositorio en Artifact Registry si no existe
         if: steps.check_repo_exists.outcome != 'success'
         run: |
-          gcloud artifacts repositories create $REPOSITORY --repository-format=docker --location=$GKE_ZONE
+          gcloud artifacts repositories create $REPOSITORY --repository-format=docker --location=$GAR_LOCATION
 
       # gcloud configure docker
       - name: Configure Docker
@@ -71,7 +72,7 @@ jobs:
           fi
 
           docker build \
-            --tag "$GKE_ZONE-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$TAG" \
+            --tag "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$TAG" \
             --build-arg GITHUB_SHA="$GITHUB_SHA" \
             --build-arg GITHUB_REF="$GITHUB_REF" \
             .
@@ -79,7 +80,7 @@ jobs:
       - name: Push Docker image
         run: |
           TAG="${GITHUB_REF##*/}"
-          docker push "$GKE_ZONE-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$TAG"
+          docker push "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$TAG"
 
       - name: Deploy to Cloud Run - feature/skipe branches
         if: startsWith(github.ref, 'feature/') || startsWith(github.ref, 'skipe/')
