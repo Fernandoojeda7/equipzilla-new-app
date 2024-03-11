@@ -67,7 +67,7 @@ jobs:
 
       # Tag Docker image with GCR URI
       - name: Tag Docker image
-        run: docker tag $IMAGE
+        run: docker tag $IMAGE $IMAGE
 
       # Push Docker image to Container Registry
       - name: Push Docker image
